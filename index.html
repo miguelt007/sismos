@@ -180,7 +180,10 @@
         }
 
         return `<tr class="${highlightClass}">` +
-               cols.map(c => `<td>${c === timeKey ? emoji : ''}${formatValue(c, row[c, row[c], row)}</td>`).join('') +
+               cols.map(c => {
+  const value = row[c];
+  return `<td>${c === timeKey ? emoji : ''}${formatValue(c, value, row)}</td>`;
+}).join('') +
                '</tr>';
       }).join('');
     }
