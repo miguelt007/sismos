@@ -66,17 +66,17 @@
         const mag = parseFloat(magRaw);
 
         return {
-          local: item.local,
-          mag,
+          local: item.local || 'Local desconhecido',
+          mag: isNaN(mag) ? 'N/D' : mag,
           time: item.time ? new Date(item.time) : null
         };
-      }).filter(item =>
-        item.time &&
-        !isNaN(item.mag) &&
-        item.mag !== -99.0
-      );
+      });
 
-      items.sort((a, b) => b.time - a.time);
+      items.sort((a, b) => {
+        if (!a.time || !b.time) return 0;
+        return b.time - a.time;
+      });
+
       return items;
     }
 
@@ -94,7 +94,7 @@
         li.innerHTML = `
           <div class="location">${item.local}</div>
           <div class="mag">Magnitude: ${item.mag}</div>
-          <div class="time">${item.time.toLocaleString('pt-PT')}</div>
+          <div class="time">${item.time ? item.time.toLocaleString('pt-PT') : 'Data desconhecida'}</div>
         `;
         ul.appendChild(li);
       });
