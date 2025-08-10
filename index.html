@@ -111,10 +111,25 @@
     }
 
     function deriveItems(json) {
-      if (Array.isArray(json)) return json;
-      if (json && Array.isArray(json.data)) return json.data;
-      if (json && Array.isArray(json.features)) return json.features.map(f => f.properties ?? f);
-      return [];
+      if (!json || !json.features) return [];
+
+      const items = json.features.map(f => {
+        const props = f.properties || {};
+        const coords = f.geometry?.coordinates || [];
+
+        return {
+          id: f.id || `${props.time}`,
+          mag: parseFloat(props.mag?.toString().replace(',', '.')),
+          place: props.place || 'Local desconhecido',
+          time: props.time ? new Date(props.time) : null,
+          lat: coords[1] || null,
+          lon: coords[0] || null,
+          ...props
+        };
+      }).filter(item => item.time && !isNaN(item.mag));
+
+      items.sort((a, b) => b.time - a.time);
+      return items;
     }
 
     function buildColumns(items) {
@@ -143,12 +158,6 @@
       const magKey = cols.find(k => k.toLowerCase().includes('mag'));
       const timeKey = cols.find(isLikelyDateKey);
 
-      items.sort((a, b) => {
-        const da = parseDate(a[timeKey])?.getTime() ?? -Infinity;
-        const db = parseDate(b[timeKey])?.getTime() ?? -Infinity;
-        return db - da;
-      });
-
       thead.innerHTML = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
       tbody.innerHTML = items.map(row => {
         const mag = magKey ? parseFloat(row[magKey]) : null;
@@ -171,34 +180,25 @@
         }
 
         return `<tr class="${highlightClass}">` +
-               cols.map(c => `<td>${c === timeKey ? emoji : ''}${formatValue(c, row[c], row)}</td>`).join('') +
+               cols.map(c => `<td>${c === timeKey ? emoji : ''}${formatValue(c, row[c, row[c], row)}</td>`).join('') +
                '</tr>';
       }).join('');
     }
 
-    function filterByMinMag(items, minMag) {
-      if (!isFinite(minMag) || minMag <= 0) return items;
-      const guessMagKey = items.length ? Object.keys(items[0]).find(k => k.toLowerCase().includes('mag')) : null;
-      if (!guessMagKey) return items;
-      return items.filter(item => {
-        const mag = parseFloat(item[guessMagKey]);
-        return isFinite(mag) && mag >= minMag;
-      });
-    }
-
-        async function fetchData() {
+    async function fetchData() {
       try {
         statusEl.textContent = 'A atualizar...';
         errorEl.style.display = 'none';
 
         const res = await fetch(API_URL);
-        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        if (!res.ok) throw new Error(`Erro ${res.status}`);
         const json = await res.json();
 
         const items = deriveItems(json);
-        const filtered = filterByMinMag(items, parseFloat(minMagInput.value));
-        const signature = JSON.stringify(filtered.map(i => i.id || i.time || i.mag || i.lat || i.lon));
+        const minMag = parseFloat(minMagInput.value) || 0;
+        const filtered = items.filter(i => i.mag >= minMag);
 
+        const signature = JSON.stringify(filtered.map(i => i.id));
         if (signature !== lastSignature) {
           renderTable(filtered);
           lastSignature = signature;
@@ -221,10 +221,9 @@
     }
 
     intervalSel.addEventListener('change', startAutoUpdate);
-    minMagInput.addEventListener('input', fetchData);
+    minMagInput.addEventListener('change', fetchData);
     statusEl.addEventListener('click', fetchData);
 
-    // Inicialização
     fetchData();
     startAutoUpdate();
   </script>
