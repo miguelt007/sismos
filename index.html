@@ -117,16 +117,23 @@
         const props = f.properties || {};
         const coords = f.geometry?.coordinates || [];
 
+        const magRaw = props.mag?.toString().replace(',', '.');
+        const mag = parseFloat(magRaw);
+
         return {
           id: f.id || `${props.time}`,
-          mag: parseFloat(props.mag?.toString().replace(',', '.')),
+          mag,
           place: props.place || 'Local desconhecido',
           time: props.time ? new Date(props.time) : null,
           lat: coords[1] || null,
           lon: coords[0] || null,
           ...props
         };
-      }).filter(item => item.time && !isNaN(item.mag));
+      }).filter(item =>
+        item.time &&
+        !isNaN(item.mag) &&
+        item.mag !== -99.0
+      );
 
       items.sort((a, b) => b.time - a.time);
       return items;
@@ -180,10 +187,7 @@
         }
 
         return `<tr class="${highlightClass}">` +
-               cols.map(c => {
-  const value = row[c];
-  return `<td>${c === timeKey ? emoji : ''}${formatValue(c, value, row)}</td>`;
-}).join('') +
+               cols.map(c => `<td>${c === timeKey ? emoji : ''}${formatValue(c, row[c], row)}</td>`).join('') +
                '</tr>';
       }).join('');
     }
@@ -193,7 +197,7 @@
         statusEl.textContent = 'A atualizar...';
         errorEl.style.display = 'none';
 
-        const res = await fetch(API_URL);
+                const res = await fetch(API_URL);
         if (!res.ok) throw new Error(`Erro ${res.status}`);
         const json = await res.json();
 
