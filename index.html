@@ -19,9 +19,14 @@
     .error { color: #b00020; }
     .controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
     .chip { display: inline-block; padding: 2px 6px; border-radius: 6px; background: #eef; color: #224; font-size: 0.85em; margin-left: 6px;}
-    .highlight-mag { background-color: #ffe0cc; }     /* magnitude ≥ 3.0 */
-    .highlight-recent { background-color: #e0f0ff; }  /* última hora */
-    .highlight-both { background-color: #f0e0ff; }     /* ambos */
+    .highlight-mag { background-color: #ffe0cc; }
+    .highlight-recent { background-color: #e0f0ff; }
+    .highlight-both { background-color: #f0e0ff; }
+    .highlight-mag td,
+    .highlight-recent td,
+    .highlight-both td {
+      color: #111;
+    }
   </style>
 </head>
 <body>
@@ -174,14 +179,14 @@
     function filterByMinMag(items, minMag) {
       if (!isFinite(minMag) || minMag <= 0) return items;
       const guessMagKey = items.length ? Object.keys(items[0]).find(k => k.toLowerCase().includes('mag')) : null;
-            if (!guessMagKey) return items;
+      if (!guessMagKey) return items;
       return items.filter(item => {
         const mag = parseFloat(item[guessMagKey]);
         return isFinite(mag) && mag >= minMag;
       });
     }
 
-    async function fetchData() {
+        async function fetchData() {
       try {
         statusEl.textContent = 'A atualizar...';
         errorEl.style.display = 'none';
