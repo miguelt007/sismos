@@ -2,105 +2,140 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <title>Sismos em Portugal</title>
+  <title>Sismos IPMA</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    li {
-      background: #fff;
-      margin: 10px 0;
-      padding: 15px;
-      border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .mag {
-      font-weight: bold;
-      color: #d9534f;
-    }
-    .location {
-      font-size: 1.1em;
-    }
-    .time {
-      color: #555;
-    }
+    body { font-family: sans-serif; padding: 1em; background: #f0f0f0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; text-align: left; }
+    th { background: #eee; }
+    tr.highlight { background: #ffe0e0; font-weight: bold; }
+    #status { margin-top: 1em; cursor: pointer; color: blue; }
+    #error { color: red; display: none; margin-top: 0.5em; }
   </style>
 </head>
 <body>
-  <h1>Últimos Sismos em Portugal</h1>
-  <ul id="sismos">
-    <li>A carregar dados...</li>
-  </ul>
+  <h1>Sismos IPMA</h1>
+  <label>Intervalo atualização:
+    <select id="interval">
+      <option value="60000">1 min</option>
+      <option value="300000">5 min</option>
+      <option value="900000">15 min</option>
+    </select>
+  </label>
+  <label style="margin-left: 1em;">Magnitude mínima:
+    <input type="number" id="minMag" value="0" step="0.1" min="0">
+  </label>
+  <div id="status">Atualizar 🔄</div>
+  <div id="error"></div>
+  <table id="table">
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Local</th>
+        <th>Mag</th>
+        <th>Lat</th>
+        <th>Lon</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
   <script>
-    async function fetchData() {
-      const url = 'https://api.ipma.pt/open-data/observation/seismic/7.json';
-      try {
-        const response = await fetch(url);
-        const json = await response.json();
-        const items = deriveItems(json);
-        render(items);
-      } catch (error) {
-        console.error('Erro ao obter dados:', error);
-        document.getElementById('sismos').innerHTML = '<li>Erro ao carregar dados.</li>';
-      }
-    }
+    const API_URL = 'https://www.ipma.pt/resources.www/sismo/sismos.json';
+    const tableBody = document.querySelector('#table tbody');
+    const intervalSel = document.querySelector('#interval');
+    const minMagInput = document.querySelector('#minMag');
+    const statusEl = document.querySelector('#status');
+    const errorEl = document.querySelector('#error');
+
+    let timer = null;
+    let lastSignature = '';
 
     function deriveItems(json) {
-      if (!json || !Array.isArray(json.data)) return [];
+      if (!json || !json.features) return [];
 
-      const items = json.data.map(item => {
-        const magRaw = item.mag?.toString().replace(',', '.');
-        const mag = parseFloat(magRaw);
+      const items = json.features.map(f => {
+        const props = f.properties || {};
+        const coords = f.geometry?.coordinates || [];
 
         return {
-          local: item.local || 'Local desconhecido',
-          mag: isNaN(mag) ? 'N/D' : mag,
-          time: item.time ? new Date(item.time) : null
+          id: f.id || `${props.time}`,
+          mag: parseFloat(props.mag?.toString().replace(',', '.')),
+          place: props.place || 'Local desconhecido',
+          time: props.time ? new Date(props.time) : null,
+          lat: coords[1] || null,
+          lon: coords[0] || null
         };
-      });
+      }).filter(item => item.time && !isNaN(item.mag));
 
-      items.sort((a, b) => {
-        if (!a.time || !b.time) return 0;
-        return b.time - a.time;
-      });
-
+      items.sort((a, b) => b.time - a.time);
       return items;
     }
 
-    function render(items) {
-      const ul = document.getElementById('sismos');
-      ul.innerHTML = '';
+    function filterByMinMag(items, minMag) {
+      if (isNaN(minMag)) return items;
 
-      if (items.length === 0) {
-        ul.innerHTML = '<li>Sem dados disponíveis.</li>';
-        return;
-      }
+      return items.filter(item => item.mag >= minMag);
+    }
+
+    function renderTable(items) {
+      tableBody.innerHTML = '';
 
       items.forEach(item => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <div class="location">${item.local}</div>
-          <div class="mag">Magnitude: ${item.mag}</div>
-          <div class="time">${item.time ? item.time.toLocaleString('pt-PT') : 'Data desconhecida'}</div>
+        const tr = document.createElement('tr');
+        if (item.mag >= 3.5) tr.classList.add('highlight');
+
+        tr.innerHTML = `
+          <td>${item.time.toLocaleString('pt-PT', { hour12: false })}</td>
+          <td>${item.place}</td>
+          <td>${item.mag.toFixed(1)}</td>
+          <td>${item.lat?.toFixed(2)}</td>
+          <td>${item.lon?.toFixed(2)}</td>
         `;
-        ul.appendChild(li);
+        tableBody.appendChild(tr);
       });
     }
 
+    async function fetchData() {
+      try {
+        statusEl.textContent = 'A atualizar...';
+        errorEl.style.display = 'none';
+
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        const json = await res.json();
+
+        const items = deriveItems(json);
+        const filtered = filterByMinMag(items, parseFloat(minMagInput.value));
+        const signature = JSON.stringify(filtered.map(i => i.id || i.time || i.mag || i.lat || i.lon));
+
+        if (signature !== lastSignature) {
+          renderTable(filtered);
+          lastSignature = signature;
+        }
+
+        const now = new Date();
+        statusEl.textContent = `Atualizado às ${now.toLocaleTimeString('pt-PT', { hour12: false })}`;
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = 'Erro ao obter dados: ' + err.message;
+        errorEl.style.display = 'block';
+        statusEl.textContent = 'Erro';
+      }
+    }
+
+    function startAutoUpdate() {
+      if (timer) clearInterval(timer);
+      const ms = parseInt(intervalSel.value);
+      timer = setInterval(fetchData, ms);
+    }
+
+    intervalSel.addEventListener('change', startAutoUpdate);
+    minMagInput.addEventListener('input', fetchData);
+    statusEl.addEventListener('click', fetchData);
+
     fetchData();
+    startAutoUpdate();
   </script>
 </body>
 </html>
