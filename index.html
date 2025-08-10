@@ -108,15 +108,26 @@
     function deriveItems(json) {
   if (!json || !Array.isArray(json.data)) return [];
 
-  const items = json.data.map(item => {
-    const magRaw = item.mag?.toString().replace(',', '.');
-    const mag = parseFloat(magRaw);
+  return json.data
+    .map(item => {
+      const magRaw = typeof item.mag === 'string' ? item.mag.replace(',', '.') : item.mag;
+      const mag = parseFloat(magRaw);
+      const time = parseDate(item.time);
 
-    return {
-      ...item,
-      mag,
-      time: item.time ? new Date(item.time) : null
-    };
+      return {
+        ...item,
+        mag,
+        time
+      };
+    })
+    .filter(item =>
+      item.time instanceof Date &&
+      !isNaN(item.time.getTime()) &&
+      isFinite(item.mag) &&
+      item.mag !== -99.0
+    );
+    }
+    
   }).filter(item =>
     item.time &&
     !isNaN(item.mag) &&
