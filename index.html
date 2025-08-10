@@ -1,98 +1,183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt">
 <head>
-  <meta charset="UTF-8">
-  <title>Sismos IPMA</title>
+  <meta charset="utf-8" />
+  <title>Sismos IPMA em tempo real</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: sans-serif; padding: 1em; background: #f0f0f0; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
-    th, td { border: 1px solid #ccc; padding: 0.5em; text-align: left; }
-    th { background: #eee; }
-    tr.highlight { background: #ffe0e0; font-weight: bold; }
-    #status { margin-top: 1em; cursor: pointer; color: blue; }
-    #error { color: red; display: none; margin-top: 0.5em; }
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    label { font-weight: 600; }
+    input, select { padding: 6px 8px; }
+    .status { font-size: 0.9rem; opacity: 0.8; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { position: sticky; top: 0; background: #f3f3f3; color: #222; z-index: 1; }
+    th, td { border-bottom: 1px solid #e5e5e5; padding: 8px; text-align: left; vertical-align: top; }
+    tbody tr:hover { background: #f9f9f9; }
+    .muted { opacity: 0.7; font-size: 0.9em; }
+    .error { color: #b00020; }
+    .controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .chip { display: inline-block; padding: 2px 6px; border-radius: 6px; background: #eef; color: #224; font-size: 0.85em; margin-left: 6px;}
+    .highlight-mag { background-color: #ffe0cc; }     /* magnitude ≥ 3.0 */
+    .highlight-recent { background-color: #e0f0ff; }  /* última hora */
+    .highlight-both { background-color: #f0e0ff; }     /* ambos */
   </style>
 </head>
 <body>
-  <h1>Sismos IPMA</h1>
-  <label>Intervalo atualização:
-    <select id="interval">
-      <option value="60000">1 min</option>
-      <option value="300000">5 min</option>
-      <option value="900000">15 min</option>
-    </select>
-  </label>
-  <label style="margin-left: 1em;">Magnitude mínima:
-    <input type="number" id="minMag" value="0" step="0.1" min="0">
-  </label>
-  <div id="status">Atualizar 🔄</div>
-  <div id="error"></div>
-  <table id="table">
-    <thead>
-      <tr>
-        <th>Data</th>
-        <th>Local</th>
-        <th>Mag</th>
-        <th>Lat</th>
-        <th>Lon</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <header>
+    <h1 style="margin:0;">Sismicidade IPMA <span class="chip">tempo real</span></h1>
+  </header>
+
+  <div class="controls">
+    <div>
+      <label for="interval">Atualizar a cada</label>
+      <select id="interval">
+        <option value="10000">10 s</option>
+        <option value="15000">15 s</option>
+        <option value="30000" selected>30 s</option>
+        <option value="60000">1 min</option>
+        <option value="120000">2 min</option>
+      </select>
+    </div>
+    <div>
+      <label for="minMag">Magnitude mínima</label>
+      <input id="minMag" type="number" step="0.1" value="0" style="width: 6rem;" />
+    </div>
+    <div class="status" id="status" title="Clique para atualizar já">Pronto</div>
+  </div>
+
+  <div id="error" class="error" role="alert" style="display:none;"></div>
+
+  <div style="overflow:auto; max-width: 100%;">
+    <table id="table">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <script>
-    const API_URL = 'https://www.ipma.pt/resources.www/sismo/sismos.json';
-    const tableBody = document.querySelector('#table tbody');
-    const intervalSel = document.querySelector('#interval');
-    const minMagInput = document.querySelector('#minMag');
-    const statusEl = document.querySelector('#status');
-    const errorEl = document.querySelector('#error');
+    const API_URL = 'https://api.ipma.pt/open-data/observation/seismic/7.json';
+    const statusEl = document.getElementById('status');
+    const errorEl = document.getElementById('error');
+    const table = document.getElementById('table');
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    const intervalSel = document.getElementById('interval');
+    const minMagInput = document.getElementById('minMag');
 
     let timer = null;
     let lastSignature = '';
 
-    function deriveItems(json) {
-      if (!json || !json.features) return [];
-
-      const items = json.features.map(f => {
-        const props = f.properties || {};
-        const coords = f.geometry?.coordinates || [];
-
-        return {
-          id: f.id || `${props.time}`,
-          mag: parseFloat(props.mag?.toString().replace(',', '.')),
-          place: props.place || 'Local desconhecido',
-          time: props.time ? new Date(props.time) : null,
-          lat: coords[1] || null,
-          lon: coords[0] || null
-        };
-      }).filter(item => item.time && !isNaN(item.mag));
-
-      items.sort((a, b) => b.time - a.time);
-      return items;
+    function isLikelyDateKey(key) {
+      const k = key.toLowerCase();
+      return ['time','date','datetime','instant','origin','obs_time','tempo','data'].some(s => k.includes(s));
     }
 
-    function filterByMinMag(items, minMag) {
-      if (isNaN(minMag)) return items;
+    function parseDate(value) {
+      if (value == null) return null;
+      if (typeof value === 'number') {
+        const ms = value > 1e12 ? value : value * 1000;
+        const d = new Date(ms);
+        return isNaN(d) ? null : d;
+      }
+      if (typeof value === 'string') {
+        const d = new Date(value);
+        return isNaN(d) ? null : d;
+      }
+      return null;
+    }
 
-      return items.filter(item => item.mag >= minMag);
+    function formatValue(key, value, row) {
+      if (value == null) return '';
+      if (isLikelyDateKey(key)) {
+        const d = parseDate(value);
+        if (d) return d.toLocaleString('pt-PT', { timeZone: 'Europe/Lisbon', hour12: false });
+      }
+      if (typeof value === 'number') {
+        const k = key.toLowerCase();
+        if (k.includes('mag')) return value.toFixed(1);
+        if (k.includes('depth') || k.includes('prof')) return value.toFixed(value % 1 === 0 ? 0 : 1);
+        return Number.isInteger(value) ? value.toString() : value.toFixed(2);
+      }
+      if (Array.isArray(value)) return value.join(', ');
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
+    }
+
+    function deriveItems(json) {
+      if (Array.isArray(json)) return json;
+      if (json && Array.isArray(json.data)) return json.data;
+      if (json && Array.isArray(json.features)) return json.features.map(f => f.properties ?? f);
+      return [];
+    }
+
+    function buildColumns(items) {
+      const N = Math.min(items.length, 50);
+      const set = new Set();
+      for (let i = 0; i < N; i++) Object.keys(items[i]).forEach(k => set.add(k));
+      const cols = Array.from(set);
+      const priority = ['time','date','datetime','instant','obs_time','mag','magnitude','lat','latitude','lon','lng','longitude','depth','prof'];
+      cols.sort((a, b) => {
+        const ai = priority.findIndex(p => a.toLowerCase().includes(p));
+        const bi = priority.findIndex(p => b.toLowerCase().includes(p));
+        const av = ai === -1 ? Number.POSITIVE_INFINITY : ai;
+        const bv = bi === -1 ? Number.POSITIVE_INFINITY : bi;
+        return av - bv || a.localeCompare(b);
+      });
+      return cols;
     }
 
     function renderTable(items) {
-      tableBody.innerHTML = '';
+      if (!items.length) {
+        thead.innerHTML = '';
+        tbody.innerHTML = '<tr><td class="muted">Sem dados</td></tr>';
+        return;
+      }
+      const cols = buildColumns(items);
+      const magKey = cols.find(k => k.toLowerCase().includes('mag'));
+      const timeKey = cols.find(isLikelyDateKey);
 
-      items.forEach(item => {
-        const tr = document.createElement('tr');
-        if (item.mag >= 3.5) tr.classList.add('highlight');
+      items.sort((a, b) => {
+        const da = parseDate(a[timeKey])?.getTime() ?? -Infinity;
+        const db = parseDate(b[timeKey])?.getTime() ?? -Infinity;
+        return db - da;
+      });
 
-        tr.innerHTML = `
-          <td>${item.time.toLocaleString('pt-PT', { hour12: false })}</td>
-          <td>${item.place}</td>
-          <td>${item.mag.toFixed(1)}</td>
-          <td>${item.lat?.toFixed(2)}</td>
-          <td>${item.lon?.toFixed(2)}</td>
-        `;
-        tableBody.appendChild(tr);
+      thead.innerHTML = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+      tbody.innerHTML = items.map(row => {
+        const mag = magKey ? parseFloat(row[magKey]) : null;
+        const time = timeKey ? parseDate(row[timeKey]) : null;
+        const now = Date.now();
+        const isStrong = mag != null && mag >= 3.0;
+        const isRecent = time != null && (now - time.getTime()) <= 3600_000;
+
+        let highlightClass = '';
+        let emoji = '';
+        if (isStrong && isRecent) {
+          highlightClass = 'highlight-both';
+          emoji = '🔴⏰ ';
+        } else if (isStrong) {
+          highlightClass = 'highlight-mag';
+          emoji = '🔴 ';
+        } else if (isRecent) {
+          highlightClass = 'highlight-recent';
+          emoji = '⏰ ';
+        }
+
+        return `<tr class="${highlightClass}">` +
+               cols.map(c => `<td>${c === timeKey ? emoji : ''}${formatValue(c, row[c], row)}</td>`).join('') +
+               '</tr>';
+      }).join('');
+    }
+
+    function filterByMinMag(items, minMag) {
+      if (!isFinite(minMag) || minMag <= 0) return items;
+      const guessMagKey = items.length ? Object.keys(items[0]).find(k => k.toLowerCase().includes('mag')) : null;
+            if (!guessMagKey) return items;
+      return items.filter(item => {
+        const mag = parseFloat(item[guessMagKey]);
+        return isFinite(mag) && mag >= minMag;
       });
     }
 
@@ -134,6 +219,7 @@
     minMagInput.addEventListener('input', fetchData);
     statusEl.addEventListener('click', fetchData);
 
+    // Inicialização
     fetchData();
     startAutoUpdate();
   </script>
