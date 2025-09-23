@@ -92,11 +92,14 @@
       .then(res => res.json())
       .then(json => {
         eventos = Array.isArray(json.data)
-          ? json.data.filter(e => e.lat && e.lon)
+          ? json.data.filter(e => e.lat && e.lon && e.time)
           : [];
 
-        // Ordenar por data decrescente
-        eventos.sort((a, b) => new Date(b.time) - new Date(a.time));
+        eventos.sort((a, b) => {
+          const ta = new Date(a.time).getTime();
+          const tb = new Date(b.time).getTime();
+          return tb - ta;
+        });
 
         if (eventos.length === 0) {
           document.getElementById("map").innerHTML = "<p>Sem dados sísmicos disponíveis.</p>";
