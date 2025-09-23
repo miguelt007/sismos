@@ -122,7 +122,9 @@
         };
         legenda.addTo(map);
 
-        tabela = $('#tabela').DataTable();
+        tabela = $('#tabela').DataTable({
+          order: [[0, 'desc']]
+        });
 
         const regiaoSet = new Set();
         eventos.forEach(e => {
