@@ -12,11 +12,33 @@
     body { font-family: Arial, sans-serif; margin: 20px; }
     #map { height: 400px; margin-bottom: 30px; }
     table { width: 100%; }
+    .custom-icon div {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
   </style>
 </head>
 <body>
   <h1>Sismos nos Açores</h1>
+
+  <div style="margin-bottom: 20px;">
+    <label>Magnitude mínima:
+      <input type="number" id="filtroMag" step="0.1" value="0" />
+    </label>
+    <label>Profundidade máxima (km):
+      <input type="number" id="filtroDepth" step="1" value="100" />
+    </label>
+    <label>Região:
+      <select id="filtroRegiao">
+        <option value="">Todas</option>
+      </select>
+    </label>
+    <button onclick="aplicarFiltros()">Filtrar</button>
+  </div>
+
   <div id="map">A carregar mapa...</div>
+
   <table id="tabela" class="display">
     <thead>
       <tr>
@@ -35,11 +57,13 @@
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
   <script>
     const url = "https://api.ipma.pt/open-data/observation/seismic/3.json";
+    let eventos = [];
+    let map, tabela;
 
     fetch(url)
       .then(res => res.json())
       .then(json => {
-        const eventos = Array.isArray(json.data)
+        eventos = Array.isArray(json.data)
           ? json.data.filter(e => e.lat && e.lon)
           : [];
 
@@ -48,30 +72,72 @@
           return;
         }
 
-        const map = L.map('map').setView([38.7, -27.1], 6); // Centro dos Açores
+        // Inicializar mapa
+        map = L.map('map').setView([38.7, -27.1], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        const tabela = $('#tabela').DataTable();
+        // Inicializar tabela
+        tabela = $('#tabela').DataTable();
+
+        // Popular dropdown de regiões
+        const regiaoSet = new Set();
         eventos.forEach(e => {
-          const lat = parseFloat(e.lat);
-          const lon = parseFloat(e.lon);
-          const local = e.local || e.obsRegion || "Região desconhecida";
-          const mag = e.magnitud || "N/A";
-          const depth = e.depth || "N/A";
-          const time = e.time || "Sem data";
-
-          L.marker([lat, lon])
-            .addTo(map)
-            .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>${time}`);
-
-          tabela.row.add([time, local, mag, depth]);
+          const local = e.local || e.obsRegion;
+          if (local) regiaoSet.add(local);
         });
-        tabela.draw();
+        const select = document.getElementById("filtroRegiao");
+        [...regiaoSet].sort().forEach(r => {
+          const opt = document.createElement("option");
+          opt.value = r;
+          opt.textContent = r;
+          select.appendChild(opt);
+        });
+
+        aplicarFiltros(); // Mostrar dados iniciais
       })
       .catch(err => {
         console.error("Erro ao buscar dados da API:", err);
         document.getElementById("map").innerHTML = "<p>Erro ao carregar dados sísmicos.</p>";
       });
+
+    function aplicarFiltros() {
+      const minMag = parseFloat(document.getElementById("filtroMag").value);
+      const maxDepth = parseFloat(document.getElementById("filtroDepth").value);
+      const regiao = document.getElementById("filtroRegiao").value;
+
+      tabela.clear();
+      map.eachLayer(layer => {
+        if (layer instanceof L.Marker) map.removeLayer(layer);
+      });
+
+      eventos.forEach(e => {
+        const lat = parseFloat(e.lat);
+        const lon = parseFloat(e.lon);
+        const local = e.local || e.obsRegion || "Região desconhecida";
+        const mag = parseFloat(e.magnitud);
+        const depth = parseFloat(e.depth);
+        const time = e.time || "Sem data";
+
+        if (mag < minMag || depth > maxDepth) return;
+        if (regiao && local !== regiao) return;
+
+        let cor = mag <= 2.0 ? "blue" : mag <= 3.5 ? "orange" : "red";
+        let emoji = mag <= 2.0 ? "🔵" : mag <= 3.5 ? "🟡" : "🔴";
+
+        const icon = L.divIcon({
+          className: "custom-icon",
+          html: `<div style="background:${cor};"></div>`,
+          iconSize: [12, 12],
+        });
+
+        L.marker([lat, lon], { icon })
+          .addTo(map)
+          .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>${time}`);
+
+        tabela.row.add([time, local, `${emoji} ${mag}`, depth]);
+      });
+      tabela.draw();
+    }
   </script>
 </body>
 </html>
