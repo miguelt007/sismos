@@ -62,6 +62,7 @@
     <thead>
       <tr>
         <th>Data</th>
+        <th style="display:none;">Data ISO</th>
         <th>Local</th>
         <th>Magnitude</th>
         <th>Profundidade (km)</th>
@@ -126,7 +127,10 @@
         legenda.addTo(map);
 
         tabela = $('#tabela').DataTable({
-          order: [[0, 'desc']]
+          order: [[1, 'desc']],
+          columnDefs: [
+            { targets: 1, visible: false }
+          ]
         });
 
         const regiaoSet = new Set();
@@ -165,7 +169,8 @@
         const local = e.local || e.obsRegion || "Região desconhecida";
         const mag = parseFloat(e.magnitud);
         const depth = parseFloat(e.depth);
-        const time = formatarData(e.time);
+        const timeFormatada = formatarData(e.time);
+        const timeISO = e.time;
 
         if (mag < minMag || depth > maxDepth) return;
         if (regiao && local !== regiao) return;
@@ -181,9 +186,9 @@
 
         L.marker([lat, lon], { icon })
           .addTo(map)
-          .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${time}`);
+          .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${timeFormatada}`);
 
-        tabela.row.add([time, local, `${emoji} ${mag}`, depth]);
+        tabela.row.add([timeFormatada, timeISO, local, `${emoji} ${mag}`, depth]);
       });
 
       tabela.draw();
