@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Sismos nos Açores</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
+  <style>#map { height: 400px; }</style>
+</head>
+<body>
+  <h1>Sismos nos Açores</h1>
+  <div id="map"></div>
+  <table id="tabela" class="display">
+    <thead>
+      <tr><th>Data</th><th>Local</th><th>Magnitude</th><th>Profundidade</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script>
+    const url = "https://api.ipma.pt/open-data/observation/seismic/3.json";
+
+    fetch(url)
+      .then(res => res.json())
+      .then(json => {
+        const eventos = json.data.filter(e => e.latitude && e.longitude);
+        const map = L.map('map').setView([38.7, -27.1], 6); // Centro dos Açores
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        const tabela = $('#tabela').DataTable();
+        eventos.forEach(e => {
+          L.marker([e.latitude, e.longitude])
+            .addTo(map)
+            .bindPopup(`<strong>${e.local}</strong><br>Mag: ${e.mag}<br>${e.date}`);
+
+          tabela.row.add([e.date, e.local, e.mag, e.depth]);
+        });
+        tabela.draw();
+      });
+  </script>
+</body>
+</html>
