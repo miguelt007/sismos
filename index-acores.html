@@ -3,20 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <title>Sismos nos Açores</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
-  <style>#map { height: 400px; }</style>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #map { height: 400px; margin-bottom: 30px; }
+    table { width: 100%; }
+  </style>
 </head>
 <body>
   <h1>Sismos nos Açores</h1>
-  <div id="map"></div>
+  <div id="map">A carregar mapa...</div>
   <table id="tabela" class="display">
     <thead>
-      <tr><th>Data</th><th>Local</th><th>Magnitude</th><th>Profundidade</th></tr>
+      <tr>
+        <th>Data</th>
+        <th>Local</th>
+        <th>Magnitude</th>
+        <th>Profundidade (km)</th>
+      </tr>
     </thead>
     <tbody></tbody>
   </table>
 
+  <!-- Scripts -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -26,19 +39,38 @@
     fetch(url)
       .then(res => res.json())
       .then(json => {
-        const eventos = json.data.filter(e => e.latitude && e.longitude);
+        const eventos = Array.isArray(json.data)
+          ? json.data.filter(e => e.lat && e.lon)
+          : [];
+
+        if (eventos.length === 0) {
+          document.getElementById("map").innerHTML = "<p>Sem dados sísmicos disponíveis.</p>";
+          return;
+        }
+
         const map = L.map('map').setView([38.7, -27.1], 6); // Centro dos Açores
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         const tabela = $('#tabela').DataTable();
         eventos.forEach(e => {
-          L.marker([e.latitude, e.longitude])
-            .addTo(map)
-            .bindPopup(`<strong>${e.local}</strong><br>Mag: ${e.mag}<br>${e.date}`);
+          const lat = parseFloat(e.lat);
+          const lon = parseFloat(e.lon);
+          const local = e.local || e.obsRegion || "Região desconhecida";
+          const mag = e.magnitud || "N/A";
+          const depth = e.depth || "N/A";
+          const time = e.time || "Sem data";
 
-          tabela.row.add([e.date, e.local, e.mag, e.depth]);
+          L.marker([lat, lon])
+            .addTo(map)
+            .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>${time}`);
+
+          tabela.row.add([time, local, mag, depth]);
         });
         tabela.draw();
+      })
+      .catch(err => {
+        console.error("Erro ao buscar dados da API:", err);
+        document.getElementById("map").innerHTML = "<p>Erro ao carregar dados sísmicos.</p>";
       });
   </script>
 </body>
