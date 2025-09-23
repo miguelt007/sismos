@@ -92,7 +92,9 @@
       .then(res => res.json())
       .then(json => {
         eventos = Array.isArray(json.data)
-          ? json.data.filter(e => e.lat && e.lon && e.time)
+          ? json.data
+              .filter(e => e.lat && e.lon && e.time)
+              .sort((a, b) => new Date(b.time) - new Date(a.time))
           : [];
 
         if (eventos.length === 0) {
@@ -152,39 +154,32 @@
         if (layer instanceof L.Marker) map.removeLayer(layer);
       });
 
-      eventos
-        .filter(e => {
-          const mag = parseFloat(e.magnitud);
-          const depth = parseFloat(e.depth);
-          const local = e.local || e.obsRegion || "Região desconhecida";
-          if (!e.time || mag < minMag || depth > maxDepth) return false;
-          if (regiao && local !== regiao) return false;
-          return true;
-        })
-        .sort((a, b) => new Date(b.time) - new Date(a.time))
-        .forEach(e => {
-          const lat = parseFloat(e.lat);
-          const lon = parseFloat(e.lon);
-          const local = e.local || e.obsRegion || "Região desconhecida";
-          const mag = parseFloat(e.magnitud);
-          const depth = parseFloat(e.depth);
-          const time = formatarData(e.time);
+      eventos.forEach(e => {
+        const lat = parseFloat(e.lat);
+        const lon = parseFloat(e.lon);
+        const local = e.local || e.obsRegion || "Região desconhecida";
+        const mag = parseFloat(e.magnitud);
+        const depth = parseFloat(e.depth);
+        const time = formatarData(e.time);
 
-          let cor = mag <= 2.0 ? "blue" : mag <= 3.5 ? "orange" : "red";
-          let emoji = mag <= 2.0 ? "🔵" : mag <= 3.5 ? "🟡" : "🔴";
+        if (mag < minMag || depth > maxDepth) return;
+        if (regiao && local !== regiao) return;
 
-          const icon = L.divIcon({
-            className: "custom-icon",
-            html: `<div style="background:${cor};"></div>`,
-            iconSize: [12, 12],
-          });
+        let cor = mag <= 2.0 ? "blue" : mag <= 3.5 ? "orange" : "red";
+        let emoji = mag <= 2.0 ? "🔵" : mag <= 3.5 ? "🟡" : "🔴";
 
-          L.marker([lat, lon], { icon })
-            .addTo(map)
-            .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${time}`);
-
-          tabela.row.add([time, local, `${emoji} ${mag}`, depth]);
+        const icon = L.divIcon({
+          className: "custom-icon",
+          html: `<div style="background:${cor};"></div>`,
+          iconSize: [12, 12],
         });
+
+        L.marker([lat, lon], { icon })
+          .addTo(map)
+          .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${time}`);
+
+        tabela.row.add([time, local, `${emoji} ${mag}`, depth]);
+      });
 
       tabela.draw();
     }
