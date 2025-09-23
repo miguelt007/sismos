@@ -94,6 +94,7 @@
         eventos = Array.isArray(json.data)
           ? json.data.filter(e => e.lat && e.lon)
           : [];
+        eventos.sort((a, b) => new Date(b.time) - new Date(a.time));
 
         if (eventos.length === 0) {
           document.getElementById("map").innerHTML = "<p>Sem dados sísmicos disponíveis.</p>";
