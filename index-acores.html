@@ -162,7 +162,7 @@
 
         L.marker([lat, lon], { icon })
           .addTo(map)
-          .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>${time}`);
+          .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${time}`);
 
         tabela.row.add([time, local, `${emoji} ${mag}`, depth]);
       });
