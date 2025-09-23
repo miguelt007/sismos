@@ -95,12 +95,6 @@
           ? json.data.filter(e => e.lat && e.lon && e.time)
           : [];
 
-        eventos.sort((a, b) => {
-          const ta = new Date(a.time).getTime();
-          const tb = new Date(b.time).getTime();
-          return tb - ta;
-        });
-
         if (eventos.length === 0) {
           document.getElementById("map").innerHTML = "<p>Sem dados sísmicos disponíveis.</p>";
           return;
@@ -158,32 +152,40 @@
         if (layer instanceof L.Marker) map.removeLayer(layer);
       });
 
-      eventos.forEach(e => {
-        const lat = parseFloat(e.lat);
-        const lon = parseFloat(e.lon);
-        const local = e.local || e.obsRegion || "Região desconhecida";
-        const mag = parseFloat(e.magnitud);
-        const depth = parseFloat(e.depth);
-        const time = e.time ? formatarData(e.time) : "Sem data";
+      eventos
+        .filter(e => {
+          const mag = parseFloat(e.magnitud);
+          const depth = parseFloat(e.depth);
+          const local = e.local || e.obsRegion || "Região desconhecida";
+          if (!e.time || mag < minMag || depth > maxDepth) return false;
+          if (regiao && local !== regiao) return false;
+          return true;
+        })
+        .sort((a, b) => new Date(b.time) - new Date(a.time))
+        .forEach(e => {
+          const lat = parseFloat(e.lat);
+          const lon = parseFloat(e.lon);
+          const local = e.local || e.obsRegion || "Região desconhecida";
+          const mag = parseFloat(e.magnitud);
+          const depth = parseFloat(e.depth);
+          const time = formatarData(e.time);
 
-        if (mag < minMag || depth > maxDepth) return;
-        if (regiao && local !== regiao) return;
+          let cor = mag <= 2.0 ? "blue" : mag <= 3.5 ? "orange" : "red";
+          let emoji = mag <= 2.0 ? "🔵" : mag <= 3.5 ? "🟡" : "🔴";
 
-        let cor = mag <= 2.0 ? "blue" : mag <= 3.5 ? "orange" : "red";
-        let emoji = mag <= 2.0 ? "🔵" : mag <= 3.5 ? "🟡" : "🔴";
+          const icon = L.divIcon({
+            className: "custom-icon",
+            html: `<div style="background:${cor};"></div>`,
+            iconSize: [12, 12],
+          });
 
-        const icon = L.divIcon({
-          className: "custom-icon",
-          html: `<div style="background:${cor};"></div>`,
-          iconSize: [12, 12],
+          L.marker([lat, lon], { icon })
+            .addTo(map)
+            .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${time}`);
+
+          tabela.row.add([time, local, `${emoji} ${mag}`, depth]);
         });
 
-        L.marker([lat, lon], { icon })
-          .addTo(map)
-          .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${time}`);
-
-        tabela.row.add([time, local, `${emoji} ${mag}`, depth]);
-      });
       tabela.draw();
     }
 
