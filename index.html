@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <title>Sismos no Continente e Madeira</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
@@ -67,7 +65,6 @@
     <tbody></tbody>
   </table>
 
-  <!-- Scripts -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -88,11 +85,9 @@
           return;
         }
 
-        // Inicializar mapa
-        map = L.map('map').setView([38.7, -27.1], 6);
+        map = L.map('map').setView([37.5, -15.5], 6); // Continente + Madeira
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Adicionar legenda
         const legenda = L.control({ position: 'bottomright' });
         legenda.onAdd = function () {
           const div = L.DomUtil.create('div', 'legend');
@@ -106,10 +101,8 @@
         };
         legenda.addTo(map);
 
-        // Inicializar tabela
         tabela = $('#tabela').DataTable();
 
-        // Popular dropdown de regiões
         const regiaoSet = new Set();
         eventos.forEach(e => {
           const local = e.local || e.obsRegion;
@@ -123,7 +116,7 @@
           select.appendChild(opt);
         });
 
-        aplicarFiltros(); // Mostrar dados iniciais
+        aplicarFiltros();
       })
       .catch(err => {
         console.error("Erro ao buscar dados da API:", err);
