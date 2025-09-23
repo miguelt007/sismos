@@ -73,6 +73,16 @@
     let eventos = [];
     let map, tabela;
 
+    function formatarData(isoString) {
+      const d = new Date(isoString);
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const ano = d.getFullYear();
+      const hora = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes}/${ano} ${hora}:${min}`;
+    }
+
     fetch(url)
       .then(res => res.json())
       .then(json => {
@@ -85,7 +95,7 @@
           return;
         }
 
-        map = L.map('map').setView([37.5, -15.5], 6); // Continente + Madeira
+        map = L.map('map').setView([37.5, -15.5], 6); // Centro Portugal + Madeira
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         const legenda = L.control({ position: 'bottomright' });
@@ -139,7 +149,7 @@
         const local = e.local || e.obsRegion || "Região desconhecida";
         const mag = parseFloat(e.magnitud);
         const depth = parseFloat(e.depth);
-        const time = e.time || "Sem data";
+        const time = e.time ? formatarData(e.time) : "Sem data";
 
         if (mag < minMag || depth > maxDepth) return;
         if (regiao && local !== regiao) return;
