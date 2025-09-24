@@ -189,8 +189,8 @@
           .addTo(map)
           .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${timeFormatada}`);
         
-        const source = e.source || "Desconhecida";
-        tabela.row.add([timeFormatada, timeISO, local, `${emoji} ${mag}`, depth, source]);
+        const fonte = e.source || "Desconhecida";
+        tabela.row.add([timeFormatada, timeISO, local, `${emoji} ${mag}`, depth, fonte]);
       });
 
       tabela.draw();
