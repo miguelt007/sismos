@@ -66,6 +66,7 @@
         <th>Local</th>
         <th>Magnitude</th>
         <th>Profundidade (km)</th>
+        <th>Fonte</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -189,7 +190,7 @@
           .addTo(map)
           .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${timeFormatada}`);
 
-        tabela.row.add([timeFormatada, timeISO, local, `${emoji} ${mag}`, depth]);
+        tabela.row.add([timeFormatada, timeISO, local, `${emoji} ${mag}`, depth, source]);
       });
 
       tabela.draw();
