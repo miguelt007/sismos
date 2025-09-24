@@ -169,7 +169,7 @@
         const local = e.local || e.obsRegion || "Região desconhecida";
         const mag = parseFloat(e.magnitud);
         const depth = parseFloat(e.depth);
-        const source = e.source || "Desconhecida";
+        const source = parseFloat(e.source);
         const timeFormatada = e.time ? formatarData(e.time) : "Sem data";
         const timeISO = e.time || "";
 
@@ -188,7 +188,8 @@
         L.marker([lat, lon], { icon })
           .addTo(map)
           .bindPopup(`<strong>${local}</strong><br>Mag: ${mag}<br>Profundidade: ${depth} km<br>${timeFormatada}`);
-
+        
+        const source = e.source || "Desconhecida";
         tabela.row.add([timeFormatada, timeISO, local, `${emoji} ${mag}`, depth, fonte]);
       });
 
